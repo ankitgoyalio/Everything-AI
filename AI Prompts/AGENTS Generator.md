@@ -13,13 +13,6 @@ Create an `AGENTS.md` file for this codebase defining:
 -   Standards and quality gates (tests, patterns, style, PR hygiene)
 -   How agents should ask clarifying questions and stop if uncertain
 
-### Critical Requirement (must appear first in the file)
-
-Before any repo-specific rules, `AGENTS.md` must require the agent to ask:
-
--   “Is this a single repo or a monorepo?”
-    And update guidance accordingly.
-
 ## Context
 
 Apply the following fixed constraints:
@@ -57,7 +50,6 @@ If a task requires a prohibited action, the agent must stop and request human ap
 
 Internally validate that `AGENTS.md`:
 
--   Requires “single repo vs monorepo” prompt first
 -   States permissions and prohibitions clearly
 -   Provides a workflow mandating tests, explanations, repository pattern adherence
 -   Contains stop/ask rules for uncertainty and prohibited actions
