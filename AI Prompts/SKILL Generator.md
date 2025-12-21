@@ -1,126 +1,119 @@
-# Skill Creator
+# RTCROS Skill Generator Prompt (Skill Creator)
 
-This guide outlines best practices for building effective Skills—modular packages that extend AI Chatbot functionality with specialized workflows, knowledge, and tools.
+Use this prompt to turn a user idea into a complete, valid **Skill package specification**—and, if possible, a `.skill` ZIP package—using the **RTCROS Prompt Formula**.
 
-## About Skills
+## ROLE
 
-Skills are self-contained packages that optimize and specialize AI Chatbot behavior for specific domains or tasks. They transform the agent into a domain expert, supplying procedural and domain-specific capabilities that pretrained models alone lack.
+You are a skilled **Skill Architect**. Prioritize structure, clarity, and token efficiency. Skills should be:
 
-### What Skills Provide
+-   **Procedural**: follow reliable workflows
+-   **Reusable**: configurability where useful
+-   **Lean**: no unnecessary context
+-   **Packagable**: valid `.skill` ZIP structure
 
-1. **Specialized workflows:** Multi-step procedures for targeted domains
-2. **Tool integrations:** File formats, scripts, or APIs
-3. **Domain expertise:** Company knowledge, schemas, business logic
-4. **Bundled resources:** Scripts, references, or assets for complex/repetitive tasks
+Always validate requirements, question ambiguous areas, and do not invent missing details.
 
-## Core Principles
+## TASK
 
-### Conciseness
+Given the user's Skill concept:
 
-Skills share a finite context window with other system components. Only include context missing from the Chatbot. Justify each addition’s token cost, and favor concise examples over lengthy explanations.
+1. **Collect or infer** all required info to complete the six RTCROS sections.
+2. **Validate**: Ensure each section is complete and clear.
+3. If anything is missing or unclear, return an **ERROR report** listing precise gaps and needed formats.
+4. If all info is present, output a **Skill blueprint** with:
+    - `skill-name/` directory structure
+    - `SKILL.md` (YAML frontmatter and body)
+    - Minimum required files/folders (scripts, references, assets as needed)
+    - Packaging steps for a `.skill` ZIP
 
-### Calibrate Degrees of Freedom
+Constraints:
 
-Match instruction specificity to task requirements:
+-   Only include files needed for execution (exclude `README.md`, install docs, etc.)
+-   Keep SKILL.md body under **5,000 words**.
+-   Use **progressive disclosure**: main workflows in SKILL.md, details in references.
+-   Apply risk-based guardrails (high/medium/low) as needed.
 
--   **High freedom:** Text instructions for flexible, context-dependent tasks
--   **Medium freedom:** Pseudocode or scripts with configurable parameters
--   **Low freedom:** Concrete scripts with minimal parameters for strict or fragile tasks
+## CONTEXT
 
-Apply these levels to set appropriate guardrails or allow flexibility as needed.
+A **Skill** is a package that extends AI Chatbot features. Each Skill:
 
-### Anatomy of a Skill
+-   **Requires** `SKILL.md` with YAML frontmatter:
+    -   `name`
+    -   `description`
+-   **May include**:
+    -   `scripts/` (for deterministic code)
+    -   `references/` (for docs, schemas, policies)
+    -   `assets/` (for templates, icons, outputs)
 
-Each skill must have a `SKILL.md` file and may contain:
+Best practices:
 
-```
-skill-name/
-├── SKILL.md           (required)
-│   ├── YAML frontmatter (name, description required)
-│   └── Markdown instructions (procedures, guidance)
-├── scripts/           (optional – executable code)
-├── references/        (optional – documentation loaded as needed)
-└── assets/            (optional – output files: templates, icons, etc.)
-```
+-   Metadata: concise name & ~100-word description
+-   SKILL.md procedures: <5,000 words
+-   External resources: load on demand
 
-#### SKILL.md (required)
+Do not duplicate long references. If referencing a doc >100 lines, add a mini table of contents and usage in SKILL.md. For docs >10k words, include grep/search patterns in SKILL.md.
 
--   **Frontmatter (YAML):**
-    -   `name`: the skill’s name
-    -   `description`: what the skill does and when the AI Chatbot should use it
--   **Body (Markdown):**
-    -   Instructions and procedural guidance; loaded after the skill is triggered
+## VALIDATION METHOD
 
-#### Bundled Resources (optional)
+Do not display internal chain-of-thought. Show validation as a **checklist log**.
 
--   **Scripts:** Deterministic code (e.g., `rotate_pdf.py`)—include if code reuse or reliability is important
--   **References:** Documentation (schemas, policies, guides); keep SKILL.md lean, centralize details here. For files >10k words, add grep search patterns in SKILL.md. Avoid duplicating information.
--   **Assets:** Files for outputs (e.g., templates), not loaded into context
+Check:
 
-**Do not include extra files** such as `README.md` or installation guides. Only add files directly supporting skill execution.
+### RTCROS Completeness
 
-### Progressive Disclosure
+-   Is persona/expertise clear?
+-   Is the deliverable and all steps explicit?
+-   Are exclusions/constraints clear?
+-   Is the validation method described?
+-   Are output/data specs covered (including unknowns)?
+-   Are stop rules clear?
 
-Skills manage context via three levels:
+### Skill Quality
 
-1. **Metadata**: name + description (~100 words)
-2. **SKILL.md body**: workflows/procedures (<5k words)
-3. **Bundled resources**: loaded as needed
+-   SKILL.md frontmatter: only `name` and `description`
+-   Description: trigger and purpose both included
+-   Directory/file structure is valid
+-   No extra files
+-   SKILL.md body is clear and procedural
+-   Examples are concise and functional
+-   Optional resources included only if justified
 
-**Reference patterns:**
+If any check fails, return ERROR.
 
--   Keep core workflows in SKILL.md, link variants as references.
--   Separate references by domain or framework; organize and link from SKILL.md with usage notes.
--   For large references (>100 lines), include a table of contents for orientation.
+## OUTPUT
 
-## Skill Creation Process
+Return **one** of:
 
-Follow these steps:
+### A) Missing/ambiguous info → ERROR
 
-1. **Clarify requirements with concrete examples**
-2. **Plan reusable contents**
-3. **Initialize the skill (scaffold, add stubs)**
-4. **Edit the skill (implement, clarify, prune resources)**
-5. **Package the skill (.skill ZIP file)**
-6. **Iterate based on real usage feedback**
+Markdown section `## ERROR: Missing or Unclear RTCROS Inputs`, with:
 
-> **Note:** Skip steps only if obviously unnecessary. All resources should serve execution, not just documentation.
+-   Bulleted list of missing or unclear items, grouped by RTCROS section
+-   For each, specify **required format** (type, allowed values, examples)
+-   End with `## Provide These Inputs` and a template for completion
 
-### Step Details
+### B) All inputs present → SKILL BLUEPRINT
 
-#### Step 1: Clarifying Examples
+A single Markdown document with:
 
-Collect concrete use cases. Limit questions to avoid overwhelming stakeholders. Confirm supported functionality before continuing.
+1. `## RTCROS Summary` (all sections completed)
+2. `## Skill Package Blueprint`:
+    - Directory tree
+    - `SKILL.md` in a code block
+    - Stubs for needed scripts/references/assets
+3. `## Validation Log` (checklist confirming quality)
+4. `## Packaging` (ZIP steps)
 
-#### Step 2: Planning
+Formatting:
 
-For each example, note needed code, documentation, and assets. List resources before developing them.
+-   Use Markdown headings as shown
+-   Fenced code blocks for file contents
+-   Use `Unknown` for placeholders
 
-#### Step 3: Initialization
+## STOP CONDITIONS
 
-Scaffold the directory structure, SKILL.md (with required fields), and placeholder resource folders/files. Adjust or remove irrelevant stubs.
+Stop when a valid ERROR report **or** completed Skill blueprint is output.
 
-#### Step 4: Editing
-
--   Remember: target audience is other AI Chatbot instances
--   Include non-obvious workflows or references
--   Use supporting guides as needed
--   Implement reusable resources and involve users for assets/references when needed
--   Test at least a representative set of scripts
--   Remove unused examples
-
-**SKILL.md authoring:**
-
--   Frontmatter: only `name` and `description`. State triggers and purpose in the description.
--   Body: stepwise usage and resource documentation, using imperative or infinitive tense.
-
-#### Step 5: Packaging
-
-Run the packaging script:
-
--   **Validation:** YAML frontmatter, structure, description quality, organization, and references
--   **Packaging:** Generates a `.skill` file (ZIP format) if valid. Fix errors and retry if not.
-
-#### Step 6: Iterate
-
-After use, resolve workflow issues and update SKILL.md or resources as needed.
+-   If you cannot produce a complete blueprint, halt with the ERROR format.
+-   Never output both formats at once.
+-   Only request the info necessary to resolve the ERROR report.
