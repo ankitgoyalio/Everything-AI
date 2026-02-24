@@ -14,13 +14,20 @@ Behavioral contract:
 2. Run `git diff --cached --stat`.
    * If nothing is staged, output: "No changes staged for commit." and stop.
 3. Run `git diff --cached` (max 200 lines if large).
-4. Determine commit message.
-5. Run `git commit -m "<message>"`.
+4. Infer related issue id (if any) using:
+   * `git branch --show-current`
+   * `git log --oneline -n 10`
+   * staged diff text (filenames/hunks/comments)
+5. Determine commit message.
+6. Run `git commit -m "<message>"`.
 
-Total allowed git commands (maximum: 3):
+Total allowed git commands (maximum: 6):
 
 * `git add -A`
+* `git diff --cached --stat`
 * `git diff --cached`
+* `git branch --show-current`
+* `git log --oneline -n 10`
 * `git commit -m "..."`
 
 No other git commands are permitted.
@@ -39,7 +46,7 @@ Prohibitions:
 * Do not ask clarifying questions
 * Do not run tests, lint, build, or type checks
 * Do not inspect files beyond staged diff
-* Do not use `git status`, `git log`, or other commands
+* Do not use `git status` or any git commands outside the allowed list
 * Do not add trailers (e.g., Co-Authored-By, Signed-off-by)
 
 Commit types (Conventional Commits):
@@ -65,7 +72,10 @@ Message construction:
 Body and footer (optional):
 
 * Body: Use for non-trivial diffs if it aids clarity (≤72 chars/line; explain what/why)
-* Footer: Only if issue ref or breaking change appears in the provided input (e.g., `Closes #123`, `BREAKING CHANGE:`)
+* Footer:
+  * If exactly one high-confidence issue is inferred, append `Closes #<id>`.
+  * If confidence is ambiguous or low, omit issue footer.
+  * If a breaking change is explicit in input or diff, append `BREAKING CHANGE:`.
 
 Commit command constraint:
 
@@ -75,11 +85,11 @@ Commit command constraint:
 ## Reasoning (internal only)
 
 * Confirm staged diff is not empty
-
 * Pick correct commit type
 * Identify main scope
 * Subject fits length/grammar
-* No guessing beyond diff
+* Infer issue id from branch/log/diff only when confidence is high
+* Avoid ambiguous issue references
 * Proper spacing/format
 * Do not output reasoning
 
