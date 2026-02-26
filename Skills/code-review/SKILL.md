@@ -47,6 +47,7 @@ CodeRabbit integration rules:
 - `coderabbit` must be installed and authenticated before review.
 - If authentication is unavailable or the command fails, stop and return a failure.
 - Do not use interactive CodeRabbit mode; always prefer `--plain` for automation-safe runs.
+- Do not drop findings because priority mapping is unclear; include all actionable CodeRabbit findings.
 
 Once the base branch is confirmed, run CodeRabbit review and output **only** a structured Markdown review in the Output format below.
 
@@ -93,14 +94,19 @@ Guidelines:
 - One finding per distinct issue.
 - Cite short line ranges (ideally 1–5 lines; avoid >10).
 - Use a `suggestion` block only for ≤3 lines of replacement code, no commentary. Preserve indentation.
+- Apply fail-open severity mapping:
+  - Map to `P0`/`P1`/`P2`/`P3` when clear.
+  - If unclear, mark as `Unmapped` and keep the finding.
+  - Never suppress a finding only because severity is uncertain.
 
 Priority:
 
-- Start each finding title with priority: `[P0]`, `[P1]`, `[P2]`, or `[P3]`.
+- Start each finding title with priority: `[P0]`, `[P1]`, `[P2]`, `[P3]`, or `[Unmapped]`.
   - **P0**: blocking, must fix immediately
   - **P1**: urgent, fix next cycle
   - **P2**: fix eventually
   - **P3**: low priority
+  - **Unmapped**: valid issue where confidence in exact P-level mapping is low
 - Level must be clear in the tag.
 
 ## 4. Reasoning
@@ -108,8 +114,10 @@ Priority:
 Follow this review process:
 
 1. **CodeRabbit pass**: Run `coderabbit review --plain ...` and extract findings.
-2. **Filter findings**: Keep only actionable findings in scope (correctness, security, performance, reliability, maintainability).
-3. **Minimal comments**: Each explanation is a single brief paragraph.
+2. **Scope filter**: Keep actionable findings in scope (correctness, security, performance, reliability, maintainability).
+3. **Fail-open mapping**: Assign `P0`-`P3` when confident; otherwise mark `Unmapped`.
+4. **Parity check**: Ensure no in-scope CodeRabbit finding is lost during mapping/formatting.
+5. **Minimal comments**: Each explanation is a single brief paragraph.
 
 Confidence scoring:
 
@@ -131,7 +139,7 @@ Return a structured Markdown review exactly as below; do not include JSON or cod
 
 For each issue, use:
 
-#### [P0–P3] <Title, ≤80 chars>
+#### [P0–P3|Unmapped] <Title, ≤80 chars>
 
 - **File**:
 - **Lines**: <start–end>
@@ -143,7 +151,7 @@ If you provide a suggestion, include a fenced code block (≤3 lines) with only 
 Output rules:
 
 - One section per distinct issue.
-- Only issues from the patch.
+- Include every in-scope issue reported by CodeRabbit; do not exclude due to uncertain priority mapping.
 - Each explanation: single paragraph.
 - If no qualifying findings, output:
   `No qualifying issues found.`
