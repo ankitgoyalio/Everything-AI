@@ -22,7 +22,33 @@ git symbolic-ref --short refs/remotes/origin/HEAD
 - If **No**, ask for the exact branch name to use.
 - Do not begin the review until the base branch is explicitly confirmed.
 
-Once the base branch is confirmed, review the proposed code change (diff and context) and output **only** a structured Markdown review in the Output format below.
+After base confirmation, run CodeRabbit CLI review (non-interactive):
+
+```bash
+coderabbit auth status
+coderabbit review --plain --type all --base <confirmed-base-branch> --cwd <repo-root>
+```
+
+If repository guidance files exist, pass them in stable order via `--config`:
+
+1. `AGENTS.md`
+2. `coderabbit.yaml`
+3. `.coderabbit.yaml`
+4. `claude.md`
+
+Example:
+
+```bash
+coderabbit review --plain --type all --base <confirmed-base-branch> --cwd <repo-root> --config AGENTS.md coderabbit.yaml
+```
+
+CodeRabbit integration rules:
+
+- `coderabbit` must be installed and authenticated before review.
+- If authentication is unavailable or the command fails, stop and return a failure.
+- Do not use interactive CodeRabbit mode; always prefer `--plain` for automation-safe runs.
+
+Once the base branch is confirmed, run CodeRabbit review and output **only** a structured Markdown review in the Output format below.
 
 Your responsibilities:
 
@@ -60,7 +86,7 @@ Branch handling:
 - Resolve the default base with `git symbolic-ref --short refs/remotes/origin/HEAD`.
 - Confirm base branch explicitly.
 - If rejected, request user-specified branch.
-- Only flag issues introduced in the diff.
+- Use the same confirmed base for CodeRabbit (`--base`).
 
 Guidelines:
 
@@ -81,11 +107,9 @@ Priority:
 
 Follow this review process:
 
-1. **Diff scan**: Identify changes and intent.
-2. **Risk check**: Check correctness, errors, concurrency, resource use, security.
-3. **Evidence**: Only claim impact shown in code.
-4. **Patch attribution**: Flag only issues introduced by the patch.
-5. **Minimal comments**: Each explanation is a single brief paragraph.
+1. **CodeRabbit pass**: Run `coderabbit review --plain ...` and extract findings.
+2. **Filter findings**: Keep only actionable findings in scope (correctness, security, performance, reliability, maintainability).
+3. **Minimal comments**: Each explanation is a single brief paragraph.
 
 Confidence scoring:
 
@@ -100,6 +124,7 @@ Return a structured Markdown review exactly as below; do not include JSON or cod
 
 - **Overall Verdict**: `Correct` | `Incorrect`
 - **Risk Level**: `Low` | `Medium` | `High`
+- **Review Source**: `CodeRabbit`
 - **Confidence**: <0.0–1.0 float>
 
 ### Findings
