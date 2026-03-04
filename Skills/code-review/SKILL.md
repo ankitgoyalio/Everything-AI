@@ -26,15 +26,20 @@ After base confirmation, run CodeRabbit CLI review (non-interactive):
 
 ```bash
 coderabbit auth status
-coderabbit review --plain --type all --base <confirmed-base-branch> --cwd <repo-root>
+coderabbit review --plain --base <confirmed-base-branch> --cwd <repo-root>
 ```
+
+Execution rule:
+
+- Start `coderabbit review` in the background.
+- Let it run as long as needed; do not impose a short fixed polling window.
+- Check the running session periodically and wait for completion or a clear terminal failure before finalizing the review.
+- Treat temporary telemetry/network noise as non-fatal unless the actual review command exits with failure or never returns substantive output.
 
 If repository guidance files exist, pass them in stable order via `--config`:
 
 1. `AGENTS.md`
-2. `coderabbit.yaml`
-3. `.coderabbit.yaml`
-4. `claude.md`
+2. `claude.md`
 
 Example:
 
@@ -113,7 +118,7 @@ Priority:
 
 Follow this review process:
 
-1. **CodeRabbit pass**: Run `coderabbit review --plain ...` and extract findings.
+1. **CodeRabbit pass**: Run `coderabbit review --plain ...` in the background, poll periodically until it completes, and then extract findings.
 2. **Scope filter**: Keep actionable findings in scope (correctness, security, performance, reliability, maintainability).
 3. **Fail-open mapping**: Assign `P0`-`P3` when confident; otherwise mark `Unmapped`.
 4. **Parity check**: Ensure no in-scope CodeRabbit finding is lost during mapping/formatting.
@@ -161,6 +166,7 @@ Output rules:
 Stop when:
 
 - The base branch is resolved and explicitly confirmed (Yes) or replaced (No + user-provided).
+- The background CodeRabbit run has completed or failed definitively.
 - All qualifying findings are listed.
 - Provide Summary and Markdown only.
 - Do not add extra commentary or sections.
