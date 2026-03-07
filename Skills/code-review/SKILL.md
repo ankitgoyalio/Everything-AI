@@ -1,13 +1,11 @@
 ---
 name: code-review
-description: Senior engineer PR review workflow. Use when asked to review a diff or pull request for correctness, security, reliability, performance, and maintainability, using CodeRabbit as one input but returning only high-signal findings in a structured Markdown review.
+description: Senior engineer PR review workflow. Use when asked to review a diff or pull request for correctness, security, reliability, performance, and maintainability, using CodeRabbit as one input but returning only high-signal findings in a structured Markdown review
 ---
 
-# Code Review
+# Role and Objective
 
-## Role
-
-Act as a senior software engineer reviewing a proposed patch. Prioritize correctness, security, reliability, performance, and material maintainability risks. Be direct and selective. Prefer no findings over weak findings.
+Act as a senior software engineer reviewing a proposed patch. Prioritize correctness, security, reliability, performance, and material maintainability risks. Be direct and selective. Prefer no findings over weak findings. Prefer concise, information-dense writing.
 
 ## Preconditions
 
@@ -19,7 +17,8 @@ git diff --quiet --
 
 - If this exits non-zero, stop immediately.
 - Tell the user the review cannot proceed until unstaged changes are staged or reverted.
-- Do not resolve a base branch and do not run CodeRabbit when unstaged changes exist.
+- Do not resolve a base branch.
+- Do not run CodeRabbit when unstaged changes exist.
 
 Resolve the default remote base branch:
 
@@ -29,8 +28,27 @@ git symbolic-ref --short refs/remotes/origin/HEAD
 
 - Present the resolved branch, for example `origin/main`.
 - Ask the user to confirm it with a Yes/No answer.
-- If the user says No, ask for the exact base branch name.
+- If the user says `No`, ask for the exact base branch name.
 - Do not start the review until the base branch is explicitly confirmed.
+
+## Review Workflow
+
+Follow this sequence:
+
+1. Run the worktree gate and abort on unstaged changes.
+2. Resolve and explicitly confirm the base branch.
+3. Run CodeRabbit and wait for completion.
+4. Read the diff yourself for any comment you may keep.
+5. Filter CodeRabbit output aggressively using the default exclusions and materiality tests.
+6. Merge duplicates by root cause.
+7. Assign priority and confidence.
+8. Decide whether the patch is overall `Correct` or `Incorrect`.
+
+Use shell commands only via the terminal tool. Do not skip prerequisite checks or confirmation steps just because the likely outcome seems obvious.
+
+Treat the review as incomplete until either a stop condition is reached or the final output includes all required summary fields and every surviving distinct finding.
+
+Mark the patch `Incorrect` when at least one finding is serious enough that the author should address it before merge. Otherwise mark it `Correct`.
 
 ## CodeRabbit Pass
 
@@ -48,6 +66,7 @@ Execution rules:
 - Use non-interactive plain-text mode only.
 - Start the review in the background and poll until it finishes or clearly fails.
 - Treat transient telemetry or network noise as non-fatal unless the command itself fails or never produces substantive review output.
+- If the review output is empty, partial, or suspiciously narrow, retry with one or two reasonable fallback checks before concluding failure.
 
 If repository guidance files exist, pass them in stable order:
 
@@ -60,7 +79,7 @@ Example:
 coderabbit review --plain --type all --base <confirmed-base-branch> --cwd <repo-root> --config AGENTS.md claude.md
 ```
 
-## Source Hierarchy
+## Source Priority
 
 Use CodeRabbit as an input, not as the final authority.
 
@@ -176,42 +195,47 @@ Assign a confidence score from `0.0` to `1.0`.
 - Lower confidence is acceptable only when the issue is still concrete and patch-local.
 - Do not keep speculative findings merely to preserve coverage.
 
-## Review Process
+## Reasoning and Verification
 
-Follow this sequence:
+Think through the review internally and do not reveal internal reasoning unless explicitly requested.
 
-1. Run the worktree gate and abort on unstaged changes.
-2. Resolve and explicitly confirm the base branch.
-3. Run CodeRabbit and wait for completion.
-4. Read the diff yourself for any comment you may keep.
-5. Filter CodeRabbit output aggressively using the default exclusions and materiality tests.
-6. Merge duplicates by root cause.
-7. Assign priority and confidence.
-8. Decide whether the patch is overall `Correct` or `Incorrect`.
+As you review:
 
-Mark the patch `Incorrect` when at least one finding is serious enough that the author should address it before merge. Otherwise mark it `Correct`.
+- Verify each finding against the changed code path.
+- Confirm each finding survives the materiality tests.
+- Deduplicate by root cause before producing output.
+- Prefer no findings over speculative or weak findings.
+- Before finalizing, check correctness, grounding in the diff and tool output, and exact output formatting.
 
-## Output
+## Output Rules
 
-Return only the structured Markdown review below. Do not add preamble, notes about process, or any extra sections.
+Use the output format appropriate to the current state:
 
-### Summary
+- If review execution is blocked or incomplete, return only the corresponding stop-state message.
+- If the review is complete, return only the structured Markdown review below.
+- Return exactly the requested format for the current state, and nothing else.
+- Do not add preamble, notes about process, or any extra sections.
+- Do not pad the output to match the number of CodeRabbit comments.
+- The goal is a high-signal review, not parity with raw tool output.
+
+## Summary Section
 
 - **Overall Verdict**: `Correct` | `Incorrect`
 - **Risk Level**: `Low` | `Medium` | `High`
 - **Review Source**: `CodeRabbit + manual triage`
 - **Confidence**: <0.0-1.0 float>
 
-### Findings
+## Findings Section
 
 For each issue:
 
+```markdown
 #### [P0|P1|P2|P3] <Title, <=80 chars>
-
 - **File**:
 - **Lines**: <start-end>
 - **Why this matters**:
 - **Confidence**: <0.0-1.0 float>
+```
 
 Rules:
 
@@ -219,7 +243,7 @@ Rules:
 - Each explanation must be one short paragraph.
 - Use your own wording.
 - Include only findings that survive filtering.
-- If no qualifying findings remain, output:
+- If no qualifying findings remain, keep the Summary section and set the Findings section body to:
   `No qualifying issues found.`
 
 If a tiny replacement snippet is unusually helpful, include one fenced code block with no commentary and at most 3 lines of replacement code.
@@ -233,4 +257,59 @@ Stop when any of these occurs:
 - CodeRabbit authentication or execution fails definitively.
 - The review is complete and all surviving findings are listed.
 
-Do not pad the output to match the number of CodeRabbit comments. The goal is a high-signal review, not parity with raw tool output.
+## Exact Output Formats
+
+When unstaged changes are detected, output only:
+
+```text
+Review cannot proceed until unstaged changes are staged or reverted.
+```
+
+When base-branch confirmation is pending after resolving the default remote base branch, output only:
+
+```text
+Resolved base branch: <resolved-branch>
+Please confirm this base branch with Yes or No.
+```
+
+If the user answers `No`, output only:
+
+```text
+Please provide the exact base branch name.
+```
+
+When CodeRabbit authentication or execution fails definitively, output only:
+
+```text
+CodeRabbit review failed: <brief reason>
+```
+
+When the review is complete, output only this Markdown structure:
+
+```markdown
+### Summary
+- **Overall Verdict**: `Correct` | `Incorrect`
+- **Risk Level**: `Low` | `Medium` | `High`
+- **Review Source**: `CodeRabbit + manual triage`
+- **Confidence**: <0.0-1.0 float>
+
+### Findings
+#### [P0|P1|P2|P3] <Title, <=80 chars>
+- **File**:
+- **Lines**: <start-end>
+- **Why this matters**:
+- **Confidence**: <0.0-1.0 float>
+```
+
+If the review is complete and there are no qualifying findings, output only:
+
+```markdown
+### Summary
+- **Overall Verdict**: `Correct`
+- **Risk Level**: `Low`
+- **Review Source**: `CodeRabbit + manual triage`
+- **Confidence**: <0.0-1.0 float>
+
+### Findings
+No qualifying issues found.
+```
