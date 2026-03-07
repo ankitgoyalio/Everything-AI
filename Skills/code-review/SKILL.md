@@ -1,15 +1,15 @@
 ---
 name: code-review
-description: Senior engineer PR review workflow. Use when asked to review a diff/PR for correctness, security, performance, reliability, and maintainability, producing a structured Markdown review.
+description: Senior engineer PR review workflow. Use when asked to review a diff or pull request for correctness, security, reliability, performance, and maintainability, using CodeRabbit as one input but returning only high-signal findings in a structured Markdown review.
 ---
 
 # Code Review
 
-## 1. Role
+## Role
 
-You are a senior software engineer acting as a PR code reviewer. Focus on correctness, security, performance, and long-term maintainability. Use a direct, actionable tone.
+Act as a senior software engineer reviewing a proposed patch. Prioritize correctness, security, reliability, performance, and material maintainability risks. Be direct and selective. Prefer no findings over weak findings.
 
-## 2. Task
+## Preconditions
 
 Before resolving the base branch, check for unstaged changes:
 
@@ -17,35 +17,39 @@ Before resolving the base branch, check for unstaged changes:
 git diff --quiet --
 ```
 
-- If this command exits non-zero, stop immediately and tell the user the review cannot proceed until unstaged changes are staged or reverted.
-- Do not resolve or confirm a base branch, and do not run CodeRabbit, when unstaged changes are present.
+- If this exits non-zero, stop immediately.
+- Tell the user the review cannot proceed until unstaged changes are staged or reverted.
+- Do not resolve a base branch and do not run CodeRabbit when unstaged changes exist.
 
-Before starting, determine the default remote base branch using:
+Resolve the default remote base branch:
 
 ```bash
 git symbolic-ref --short refs/remotes/origin/HEAD
 ```
 
-- Present the resolved branch (e.g., `origin/main`) and request a **Yes/No** confirmation to use it as the base for comparison.
-- If **Yes**, use it as the base branch.
-- If **No**, ask for the exact branch name to use.
-- Do not begin the review until the base branch is explicitly confirmed.
+- Present the resolved branch, for example `origin/main`.
+- Ask the user to confirm it with a Yes/No answer.
+- If the user says No, ask for the exact base branch name.
+- Do not start the review until the base branch is explicitly confirmed.
 
-After base confirmation, run CodeRabbit CLI review (non-interactive):
+## CodeRabbit Pass
+
+After base confirmation, run:
 
 ```bash
 coderabbit auth status
-coderabbit review --plain --base <confirmed-base-branch> --cwd <repo-root>
+coderabbit review --plain --type all --base <confirmed-base-branch> --cwd <repo-root>
 ```
 
-Execution rule:
+Execution rules:
 
-- Start `coderabbit review` in the background.
-- Let it run as long as needed; do not impose a short fixed polling window.
-- Check the running session periodically and wait for completion or a clear terminal failure before finalizing the review.
-- Treat temporary telemetry/network noise as non-fatal unless the actual review command exits with failure or never returns substantive output.
+- `coderabbit` must be installed and authenticated.
+- If authentication fails or the command fails definitively, stop and report failure.
+- Use non-interactive plain-text mode only.
+- Start the review in the background and poll until it finishes or clearly fails.
+- Treat transient telemetry or network noise as non-fatal unless the command itself fails or never produces substantive review output.
 
-If repository guidance files exist, pass them in stable order via `--config`:
+If repository guidance files exist, pass them in stable order:
 
 1. `AGENTS.md`
 2. `claude.md`
@@ -53,133 +57,180 @@ If repository guidance files exist, pass them in stable order via `--config`:
 Example:
 
 ```bash
-coderabbit review --plain --type all --base <confirmed-base-branch> --cwd <repo-root> --config AGENTS.md coderabbit.yaml
+coderabbit review --plain --type all --base <confirmed-base-branch> --cwd <repo-root> --config AGENTS.md claude.md
 ```
 
-CodeRabbit integration rules:
+## Source Hierarchy
 
-- `coderabbit` must be installed and authenticated before review.
-- If authentication is unavailable or the command fails, stop and return a failure.
-- Do not use interactive CodeRabbit mode; always prefer `--plain` for automation-safe runs.
-- Do not drop findings because priority mapping is unclear; include all actionable CodeRabbit findings.
+Use CodeRabbit as an input, not as the final authority.
 
-Once the base branch is confirmed, run CodeRabbit review and output **only** a structured Markdown review in the Output format below.
+- The patch itself is primary.
+- CodeRabbit findings are secondary evidence.
+- Repository instructions are binding.
 
-Your responsibilities:
+You must independently filter, merge, and reword CodeRabbit output before returning findings.
 
-- Identify all actionable issues a knowledgeable author would address.
-- Prefer zero findings over minor nitpicks.
-- Judge if the patch is overall correct.
+## Review Standard
 
-### What to Flag (Qualifying Findings)
+Report only issues a strong author would likely fix before merging.
 
-Flag only if it significantly affects:
+Qualifying findings must be:
 
-- Correctness / accuracy
-- Security / privacy
-- Performance / scalability
-- Reliability / robustness
-- Maintainability (only real future risk, not preference)
+- Introduced by the patch, or made materially worse by the patch.
+- Actionable and specific.
+- Supported by the changed code path.
+- Important enough to affect merge readiness or near-term follow-up.
 
-### What NOT to Flag
+Flag findings only when they materially affect:
 
-- Trivial formatting/style unless it obscures meaning or violates explicit standards.
-- Pre-existing issues not introduced by the patch.
-- Speculation about unrelated breakage unless a provably affected code path exists.
-- Intentional behavior changes unless they clearly introduce a bug.
+- Correctness
+- Security or privacy
+- Reliability or lifecycle safety
+- Performance or scalability
+- Maintainability, but only when the patch introduces real future defect risk
 
-## 3. Context
+## Default Exclusions
 
-Assume:
+Do not report these unless the repo instructions explicitly require them or the impact is truly material:
 
-- Review is of a single proposed patch.
-- The patch is the diff between the current branch and the confirmed base branch.
-- Inline comments refer to specific code locations.
-- Unstaged changes must block the review entirely.
+- Style, naming, formatting, and comment cleanup
+- Pure refactor suggestions
+- Idiomatic-preference feedback tied only to language style
+- “Consider using `let`” or similar immutability nits
+- Dead commented code unless it hides active behavior
+- Placeholder resource cleanup with no user-visible or build impact
+- Duplication complaints without a concrete defect risk
+- Large parameter lists without a demonstrated maintenance hazard in this patch
+- Generic “use structured logging” advice
+- Suggestions to replace an API with a more idiomatic language-specific pattern
+- Weak memory-leak speculation without a real retention path
 
-Branch handling:
+By default, suppress CodeRabbit categories such as `nitpick` and `refactor_suggestion`.
 
-- Resolve the default base with `git symbolic-ref --short refs/remotes/origin/HEAD`.
-- Confirm base branch explicitly.
-- If rejected, request user-specified branch.
-- Use the same confirmed base for CodeRabbit (`--base`).
+Only promote one of those comments into a finding if the explanation demonstrates a real bug or material risk introduced by the patch.
 
-Guidelines:
+## Materiality Tests
 
-- One finding per distinct issue.
-- Cite short line ranges (ideally 1–5 lines; avoid >10).
-- Use a `suggestion` block only for ≤3 lines of replacement code, no commentary. Preserve indentation.
-- Apply fail-open severity mapping:
-  - Map to `P0`/`P1`/`P2`/`P3` when clear.
-  - If unclear, mark as `Unmapped` and keep the finding.
-  - Never suppress a finding only because severity is uncertain.
+Before keeping any finding, verify all of the following:
 
-Priority:
+1. The issue is in the patch or directly caused by the patch.
+2. The failing or risky behavior is plausible, not hypothetical.
+3. The severity is meaningful enough that the author should act on it.
+4. The finding is not a duplicate of another finding.
 
-- Start each finding title with priority: `[P0]`, `[P1]`, `[P2]`, `[P3]`, or `[Unmapped]`.
-  - **P0**: blocking, must fix immediately
-  - **P1**: urgent, fix next cycle
-  - **P2**: fix eventually
-  - **P3**: low priority
-  - **Unmapped**: valid issue where confidence in exact P-level mapping is low
-- Level must be clear in the tag.
+If any check fails, drop the finding.
 
-## 4. Reasoning
+## CodeRabbit Filtering Rules
 
-Follow this review process:
+For each CodeRabbit comment:
 
-1. **Worktree gate**: Run `git diff --quiet --` and stop immediately if unstaged changes exist.
-2. **CodeRabbit pass**: Run `coderabbit review --plain ...` in the background, poll periodically until it completes, and then extract findings.
-3. **Scope filter**: Keep actionable findings in scope (correctness, security, performance, reliability, maintainability).
-4. **Fail-open mapping**: Assign `P0`-`P3` when confident; otherwise mark `Unmapped`.
-5. **Parity check**: Ensure no in-scope CodeRabbit finding is lost during mapping/formatting.
-6. **Minimal comments**: Each explanation is a single brief paragraph.
+1. Classify it as `keep`, `downgrade`, or `drop`.
+2. Drop comments that are primarily taste, cleanup, or broad architecture advice.
+3. Downgrade comments that are directionally correct but overstated; keep them only if a concrete patch-local risk remains.
+4. Merge duplicate comments that describe the same root problem across multiple lines or files.
+5. Reword the surviving finding in your own words; do not simply restate CodeRabbit.
 
-Confidence scoring:
+Examples of comments that are usually dropped:
 
-- Each finding: **Confidence** value (0.0–1.0).
-- Summary: overall **Confidence** score (0.0–1.0).
+- “Consider renaming this key for consistency”
+- “Use `let` instead of `var`”
+- “Remove commented-out code”
+- “Consider a request parameter struct”
+- “This could be more idiomatic for the language”
 
-## 5. Output
+Examples of comments that are often worth keeping if the patch clearly supports them:
 
-Return a structured Markdown review exactly as below; do not include JSON or code fences around the whole response.
+- Crash risk from unsafe indexing or force unwraps introduced by the patch
+- Broken theme or resource values affecting real UI behavior
+- Malformed URL, path, query, or request construction that can fail or misencode input
+- Operation lifecycle bugs that can leave async work incomplete
+- Corrupted project file entries that can break builds
+- Injection or query-construction risk with unsanitized dynamic input
+- Missing validation or escaping around user-controlled data
+
+## Deduping Rules
+
+Return one finding per distinct root cause.
+
+- If the same issue appears in multiple CodeRabbit comments, merge them into one finding.
+- If one issue causes another downstream symptom, report the root cause only.
+- Prefer the smallest line range that proves the issue.
+- Avoid repeating the same concern in multiple files unless separate fixes are required.
+
+## Severity Mapping
+
+Use:
+
+- `P0`: merge blocker, certain severe breakage or security impact
+- `P1`: high-priority bug or risk likely to cause failure in realistic usage
+- `P2`: meaningful but non-urgent defect risk
+- `P3`: small but still legitimate issue worth fixing
+
+Do not use `Unmapped`. If severity is too unclear to map, the finding is probably too weak to keep.
+
+## Confidence
+
+Assign a confidence score from `0.0` to `1.0`.
+
+- High confidence requires a direct code-path argument.
+- Lower confidence is acceptable only when the issue is still concrete and patch-local.
+- Do not keep speculative findings merely to preserve coverage.
+
+## Review Process
+
+Follow this sequence:
+
+1. Run the worktree gate and abort on unstaged changes.
+2. Resolve and explicitly confirm the base branch.
+3. Run CodeRabbit and wait for completion.
+4. Read the diff yourself for any comment you may keep.
+5. Filter CodeRabbit output aggressively using the default exclusions and materiality tests.
+6. Merge duplicates by root cause.
+7. Assign priority and confidence.
+8. Decide whether the patch is overall `Correct` or `Incorrect`.
+
+Mark the patch `Incorrect` when at least one finding is serious enough that the author should address it before merge. Otherwise mark it `Correct`.
+
+## Output
+
+Return only the structured Markdown review below. Do not add preamble, notes about process, or any extra sections.
 
 ### Summary
 
 - **Overall Verdict**: `Correct` | `Incorrect`
 - **Risk Level**: `Low` | `Medium` | `High`
-- **Review Source**: `CodeRabbit`
-- **Confidence**: <0.0–1.0 float>
+- **Review Source**: `CodeRabbit + manual triage`
+- **Confidence**: <0.0-1.0 float>
 
 ### Findings
 
-For each issue, use:
+For each issue:
 
-#### [P0–P3|Unmapped] <Title, ≤80 chars>
+#### [P0|P1|P2|P3] <Title, <=80 chars>
 
 - **File**:
-- **Lines**: <start–end>
+- **Lines**: <start-end>
 - **Why this matters**:
-- **Confidence**: <0.0–1.0 float>
+- **Confidence**: <0.0-1.0 float>
 
-If you provide a suggestion, include a fenced code block (≤3 lines) with only the replacement code, preserving indentation.
-
-Output rules:
+Rules:
 
 - One section per distinct issue.
-- Include every in-scope issue reported by CodeRabbit; do not exclude due to uncertain priority mapping.
-- Each explanation: single paragraph.
-- If no qualifying findings, output:
+- Each explanation must be one short paragraph.
+- Use your own wording.
+- Include only findings that survive filtering.
+- If no qualifying findings remain, output:
   `No qualifying issues found.`
 
-## 6. Stop Conditions
+If a tiny replacement snippet is unusually helpful, include one fenced code block with no commentary and at most 3 lines of replacement code.
 
-Stop when:
+## Stop Conditions
 
-- Unstaged changes are detected and the review is aborted.
-- The base branch is resolved and explicitly confirmed (Yes) or replaced (No + user-provided).
-- The background CodeRabbit run has completed or failed definitively.
-- All qualifying findings are listed.
-- Provide Summary and Markdown only.
-- Do not add extra commentary or sections.
-- If no issues, output Summary and: `No qualifying issues found.`
+Stop when any of these occurs:
+
+- Unstaged changes are detected.
+- Base-branch confirmation is still pending.
+- CodeRabbit authentication or execution fails definitively.
+- The review is complete and all surviving findings are listed.
+
+Do not pad the output to match the number of CodeRabbit comments. The goal is a high-signal review, not parity with raw tool output.
