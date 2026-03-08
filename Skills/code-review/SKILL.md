@@ -65,8 +65,18 @@ Execution rules:
 - If authentication fails or the command fails definitively, stop and report failure.
 - Use non-interactive plain-text mode only.
 - Start the review in the background and poll until it finishes or clearly fails.
-- Treat transient telemetry or network noise as non-fatal unless the command itself fails or never produces substantive review output.
-- If the review output is empty, partial, or suspiciously narrow, retry with one or two reasonable fallback checks before concluding failure.
+- Treat transient telemetry or network noise as non-fatal unless the command itself exits with a substantive error.
+- Do not treat a lack of intermediate output as failure if the process is still running.
+- Progress messages such as `Connecting`, `Setting up`, `Analyzing`, or `Reviewing` count as evidence that the review is still active.
+- If the process is still alive, continue polling for a reasonable maximum wait window before concluding failure.
+- Recommended polling behavior:
+  - poll every 30 seconds
+  - allow at least 30 minutes total wait time before timing out
+- Only treat the run as failed when one of these is true:
+  - the process exits non-zero with a substantive error
+  - the process exits successfully but produces no usable review content
+  - the process exceeds the maximum wait window without completing
+- If the review output is empty, partial, or suspiciously narrow after process completion, retry with one or two reasonable fallback checks before concluding failure.
 
 If repository guidance files exist, pass them in stable order:
 
@@ -256,6 +266,13 @@ Stop when any of these occurs:
 - Base-branch confirmation is still pending.
 - CodeRabbit authentication or execution fails definitively.
 - The review is complete and all surviving findings are listed.
+
+A definitive CodeRabbit failure means one of the following:
+
+- Authentication failed.
+- The review command exited non-zero with a substantive error.
+- The review command completed without producing usable review output.
+- The review command exceeded the allowed maximum wait time.
 
 ## Exact Output Formats
 
