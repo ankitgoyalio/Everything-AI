@@ -7,21 +7,38 @@ description: Senior engineer PR review workflow. Use when asked to review a diff
 
 Act as a senior engineer running a CodeRabbit review and translating the completed output into a clean, structured review. Use only CodeRabbit as the review source for this skill. Do not add manual review findings, extra speculation, or independent triage beyond organizing what CodeRabbit reported.
 
-## Inputs
+## Preconditions
 
-You need:
+Before resolving the base branch, check for unstaged changes:
 
-- a repository root
-- a base branch
+```bash
+git diff --quiet --
+```
 
-If the user already provides them, use those values exactly. If one is missing, resolve it locally with the smallest reasonable command and proceed without a confirmation round-trip unless the value is ambiguous.
+- If this exits non-zero, stop immediately.
+- Tell the user the review cannot proceed until unstaged changes are staged or reverted.
+- Do not resolve a base branch.
+- Do not run CodeRabbit when unstaged changes exist.
+
+Resolve the default remote base branch:
+
+```bash
+git symbolic-ref --short refs/remotes/origin/HEAD
+```
+
+- Present the resolved branch, for example `origin/main`.
+- Ask the user to confirm it with a Yes/No answer.
+- If the user says `No`, ask for the exact base branch name.
+- Do not start the review until the base branch is explicitly confirmed.
 
 ## Review Workflow
 
 Follow this sequence:
 
-1. Confirm `coderabbit` is installed and authenticated with `coderabbit auth status`.
-2. Run CodeRabbit in plain text mode:
+1. Run the worktree gate and abort on unstaged changes.
+2. Resolve and explicitly confirm the base branch.
+3. Confirm `coderabbit` is installed and authenticated with `coderabbit auth status`.
+4. Run CodeRabbit in plain text mode:
 
 ```bash
 coderabbit review --plain --type all --base <base-branch> --cwd <repo-root>
@@ -127,12 +144,33 @@ Rules:
 
 Stop only when one of these occurs:
 
+- Unstaged changes are detected.
+- Base-branch confirmation is still pending.
 - CodeRabbit authentication fails definitively.
 - The review command exits non-zero with a substantive error.
 - The review times out without ever printing a `Review completed` line.
 - The review completes and all findings are rendered in the required format.
 
 ## Exact Output Formats
+
+When unstaged changes are detected, output only:
+
+```text
+Review cannot proceed until unstaged changes are staged or reverted.
+```
+
+When base-branch confirmation is pending after resolving the default remote base branch, output only:
+
+```text
+Resolved base branch: <resolved-branch>
+Please confirm this base branch with Yes or No.
+```
+
+If the user answers `No`, output only:
+
+```text
+Please provide the exact base branch name.
+```
 
 When CodeRabbit authentication or execution fails definitively, output only:
 
