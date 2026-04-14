@@ -142,10 +142,9 @@ def is_fix_heading(line: str) -> bool:
     if not normalized:
         return False
     return (
-        "suggested fix" in normalized
-        or "proposed fix" in normalized
-        or "suggested formatting improvement" in normalized
-        or "suggested refactor direction" in normalized
+        "fix" in normalized
+        or "refactor" in normalized
+        or "hardening" in normalized
     )
 
 
