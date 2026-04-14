@@ -137,15 +137,82 @@ def parse_line_range(text: str | None) -> tuple[int | None, int | None]:
     return None, None
 
 
-def is_fix_heading(line: str) -> bool:
+SECTION_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "comment": ("comment",),
+    "proposed_fix": ("fix", "refactor", "hardening"),
+}
+SECTION_QUALIFIERS = (
+    "possible",
+    "potential",
+    "proposed",
+    "suggested",
+    "recommend",
+    "recommended",
+    "alternative",
+    "example",
+    "sample",
+)
+
+
+def normalize_section_heading(line: str) -> str:
     normalized = line.strip().lower()
+    normalized = re.sub(r"^[>\-*\s#`:_]+", "", normalized)
+    normalized = re.sub(r"[:>\-*\s#`_]+$", "", normalized)
+    normalized = re.sub(r"\s+", " ", normalized)
+    return normalized
+
+
+def is_keyword_heading(line: str, keywords: tuple[str, ...]) -> bool:
+    normalized = normalize_section_heading(line)
     if not normalized:
         return False
-    return (
-        "fix" in normalized
-        or "refactor" in normalized
-        or "hardening" in normalized
-    )
+    if len(normalized) > 80:
+        return False
+    if any(punctuation in normalized for punctuation in (".", "!", "?")):
+        return False
+
+    words = tuple(re.findall(r"[a-z]+", normalized))
+    if not words:
+        return False
+
+    if keywords == SECTION_KEYWORDS["comment"]:
+        return words == ("comment",)
+
+    has_keyword = any(keyword in words for keyword in keywords)
+    if not has_keyword:
+        return False
+
+    if any(qualifier in words for qualifier in SECTION_QUALIFIERS):
+        return True
+
+    return normalized in keywords or normalized.endswith(" fix")
+
+
+def match_section_heading(line: str) -> str | None:
+    for section, keywords in SECTION_KEYWORDS.items():
+        if is_keyword_heading(line, keywords):
+            return section
+    return None
+
+
+def extract_review_sections(lines: list[str]) -> dict[str, str]:
+    sections: dict[str, list[str]] = {}
+    current_section: str | None = None
+
+    for line in lines:
+        matched_section = match_section_heading(line)
+        if matched_section:
+            current_section = matched_section
+            sections.setdefault(current_section, [])
+            continue
+        if current_section:
+            sections.setdefault(current_section, []).append(line)
+
+    return {
+        section: "\n".join(content).strip()
+        for section, content in sections.items()
+        if "\n".join(content).strip()
+    }
 
 
 def fence_language_for_path(path: str | None) -> str:
@@ -220,19 +287,10 @@ def parse_plain_text_review(text: str) -> list[dict[str, Any]]:
         lines = block.splitlines()
         if "Comment:" in lines:
             comment_start = lines.index("Comment:") + 1
-            comment_lines: list[str] = []
-            fix_lines: list[str] = []
-            in_fix = False
-            for line in lines[comment_start:]:
-                if not in_fix and is_fix_heading(line):
-                    in_fix = True
-                    continue
-                if in_fix:
-                    fix_lines.append(line)
-                else:
-                    comment_lines.append(line)
-            comment = "\n".join(comment_lines).strip() or None
-            proposed_fix = "\n".join(fix_lines).strip() or None
+            sections = extract_review_sections(
+                ["Comment:"] + lines[comment_start:])
+            comment = sections.get("comment")
+            proposed_fix = sections.get("proposed_fix")
 
         if not path and not comment:
             continue
