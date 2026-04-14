@@ -141,7 +141,11 @@ def is_fix_heading(line: str) -> bool:
     normalized = line.strip().lower()
     if not normalized:
         return False
-    return "fix" in normalized
+    return (
+        "fix" in normalized
+        or "refactor" in normalized
+        or "hardening" in normalized
+    )
 
 
 def fence_language_for_path(path: str | None) -> str:
